@@ -1,44 +1,50 @@
 import Speech
 
-@objc(SpeechUrlRecognizer) class SpeechUrlRecognizer : CDVPlugin {
+@objc(SpeechUrlRecognizer) 
+class SpeechUrlRecognizer : CDVPlugin {
     @objc(urlRecognitionRequest:)
     func urlRecognitionRequest(command: CDVInvokedUrlCommand) {
         
-        let audio = command.argument(at: 0);
-        let audioURL = URL.init(string: audio as! String);
-        
-        let locale = command.argument(at: 1, withDefault: "en-US");
-        let supportedLocales = SFSpeechRecognizer.supportedLocales();
-        
-        let isLocaleSupported = supportedLocales.contains { l in
-            if (l.identifier == locale as! String) {
-                return true;
-            }
-            else {
-                return false;
-            }
+        guard let audio = command.argument(at: 0) as? String else {
+            sendResult(result: CDVPluginResult(status: CDVCommandStatus_ERROR, messageAs: "Error: Provided value for audioURL is not valid"), callbackId: command.callbackId);
+            return;
         }
-        
-        guard isLocaleSupported else {
-            sendResult(result: CDVPluginResult(status: CDVCommandStatus_ERROR, messageAs: "Error: Provided Locale \(locale as! String) is not supported"), callbackId: command.callbackId);
+        let audioURL = URL.init(string: audio);
+        guard audioURL != nil else {
+            sendResult(result: CDVPluginResult(status: CDVCommandStatus_ERROR, messageAs: "Error: Provided URL \(audio) is not a valid url"), callbackId: command.callbackId);
             return;
         }
         
-        guard audioURL != nil else {
-            sendResult(result: CDVPluginResult(status: CDVCommandStatus_ERROR, messageAs: "Error: Provided URL \(audio ?? "") is not a valid url"), callbackId: command.callbackId);
+        
+        guard let showPartialResults = command.argument(at: 1, withDefault: false) as? Bool else {
+            sendResult(result: CDVPluginResult(status: CDVCommandStatus_ERROR, messageAs: "Error: Provided value for showPartialResults is not valid"), callbackId: command.callbackId);
             return;
         }
 
-        let recognizer = SFSpeechRecognizer(locale: Locale.init(identifier: locale as! String))
+        
+        guard let locale = command.argument(at: 2, withDefault: "en-US") as? String else {
+            sendResult(result: CDVPluginResult(status: CDVCommandStatus_ERROR, messageAs: "Error: Provided value for locale is not valid"), callbackId: command.callbackId);
+            return;
+        }
+        
+        let supportedLocales = SFSpeechRecognizer.supportedLocales().compactMap { l in
+            return l.identifier;
+        };
+        guard supportedLocales.contains(locale) else {
+            sendResult(result: CDVPluginResult(status: CDVCommandStatus_ERROR, messageAs: "Error: Provided Locale \(locale) is not supported"), callbackId: command.callbackId);
+            return;
+        }
+
+        let recognizer = SFSpeechRecognizer(locale: Locale.init(identifier: locale))
         let request = SFSpeechURLRecognitionRequest(url: audioURL!)
 
-        request.shouldReportPartialResults = false;
+        request.shouldReportPartialResults = showPartialResults;
 
         if (recognizer?.isAvailable)! {
 
             recognizer?.recognitionTask(with: request) { [self] result, error in
                 guard error == nil else {
-                    sendResult(result: CDVPluginResult(status: CDVCommandStatus_OK, messageAs: error?.localizedDescription ?? error.debugDescription), callbackId: command.callbackId);
+                    sendResult(result: CDVPluginResult(status: CDVCommandStatus_ERROR, messageAs: error?.localizedDescription ?? error.debugDescription), callbackId: command.callbackId);
                     return;
                 }
                 
@@ -47,7 +53,12 @@ import Speech
                     return;
                 }
                 
-                sendResult(result: CDVPluginResult(status: CDVCommandStatus_OK, messageAs: result.bestTranscription.formattedString), callbackId: command.callbackId);
+                let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: result.bestTranscription.formattedString)!;
+                
+                let isFinal = !result.isFinal;
+                pluginResult.setKeepCallbackAs(isFinal);
+                
+                self.sendResult(result: pluginResult, callbackId: command.callbackId);
             }
         }
         else {
@@ -57,8 +68,17 @@ import Speech
     
     @objc(getSupportedLocales:)
     func getSupportedLocales(command: CDVInvokedUrlCommand) {
-        let locales = SFSpeechRecognizer.supportedLocales();
-        sendResult(result: CDVPluginResult(status: CDVCommandStatus_OK, messageAs: Array(locales)), callbackId: command.callbackId);
+        let locales = SFSpeechRecognizer.supportedLocales().compactMap { l in
+            return l.identifier;
+        }
+        sendResult(result: CDVPluginResult(status: CDVCommandStatus_OK, messageAs: locales), callbackId: command.callbackId);
+    }
+    
+    @objc(isAvailable:)
+    func isAvailable(command: CDVInvokedUrlCommand) {
+        let recognizer = SFSpeechRecognizer();
+        let isAvailable = recognizer?.isAvailable ?? false;
+        sendResult(result: CDVPluginResult(status: CDVCommandStatus_OK, messageAs: isAvailable), callbackId: command.callbackId);
     }
     
     @objc(checkPermission:)
