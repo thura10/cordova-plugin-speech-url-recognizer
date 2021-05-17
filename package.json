@@ -1,0 +1,22 @@
+{
+    "name": "cordova-plugin-speech-url-recognizer",
+    "version": "0.0.1",
+    "description": "Simple plugin that uses the SF Speech Recognizer library in iOS to convert audio urls to text.",
+    "cordova": {
+        "id": "cordova-plugin-speech-url-recognizer",
+        "platforms": [
+            "ios"
+        ]
+    },
+    "keywords": [
+        "cordova",
+        "speech",
+        "recognizer",
+        "sf-speech-recognizer",
+        "speech-url-recognizer",
+        "ecosystem:cordova",
+        "cordova-ios"
+    ],
+    "author": "thurasw",
+    "license": "MIT"
+}
